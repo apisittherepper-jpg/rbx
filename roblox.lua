@@ -64,7 +64,7 @@ getgenv().Settings = {
     NoRecoil = false,
     NoClip = false,
     Invisible = false,
-    SilentAim = false,
+    -- SilentAim ถูกลบออกเพราะทำให้ lag
     SilentAimPart = "Head", -- Head, Torso, HumanoidRootPart
     Antilag = false, -- FPS Boost
     AutoFire = false, -- ยิงอัตโนมัติเมื่อเล็งเป้าหมายใน FOV
@@ -596,7 +596,7 @@ local SettingsTab = CreateTab("Settings")
 CreateToggle(AimbotTab, "Aimbot", function(v) getgenv().Settings.Aimbot = v end)
 CreateToggle(AimbotTab, "Wall Check", function(v) getgenv().Settings.WallCheck = v end)
 CreateToggle(AimbotTab, "Team Check", function(v) getgenv().Settings.TeamCheck = v end)
-CreateToggle(AimbotTab, "Silent Aim", function(v) getgenv().Settings.SilentAim = v end)
+-- Silent Aim ถูกลบเนื่องจากทำให้ระบบค้าง
 CreateToggle(AimbotTab, "Show FOV", function(v) getgenv().Settings.ShowFOV = v end)
 CreateStepper(AimbotTab, "Smoothness", 0.2, 0.1, 1, 0.1, function(v) getgenv().Settings.Smoothness = v end)
 CreateStepper(AimbotTab, "FOV Radius", 150, 10, 800, 10, function(v) getgenv().Settings.FOVSize = v end)
@@ -703,31 +703,72 @@ CreateSlider(ESPTab, "Box Blue", 0, 0, 255, 0, function(v) getgenv().Settings.ES
 -- PAGE 4: SETTINGS (ตั้งค่า)
 CreateToggle(SettingsTab, "FPS Boost (Anti Lag)", function(v) 
     getgenv().Settings.Antilag = v
-    if v then
-        pcall(function()
-            local Terrain = workspace:FindFirstChildOfClass("Terrain")
+end)
+
+-- [[ ANTI-LAG FUNCTION - ใช้ซ้ำได้ ]]
+local function ApplyAntiLag()
+    pcall(function()
+        local Terrain = workspace:FindFirstChildOfClass("Terrain")
+        if Terrain then
             Terrain.WaterWaveSize = 0
             Terrain.WaterWaveSpeed = 0
             Terrain.WaterReflectance = 0
             Terrain.WaterTransparency = 0
-            
-            game.Lighting.GlobalShadows = false
-            game.Lighting.FogEnd = 9e9
-            settings().Rendering.QualityLevel = 1
-            
-            for _, v in pairs(game:GetDescendants()) do
-                if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
-                    v.Material = Enum.Material.SmoothPlastic
-                    v.Reflectance = 0
-                elseif v:IsA("Decal") and v.Name ~= "DevHubIcon" then
-                    v.Transparency = 1
-                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-                    v.Lifetime = NumberRange.new(0)
-                end
+        end
+        
+        game.Lighting.GlobalShadows = false
+        game.Lighting.FogEnd = 9e9
+        settings().Rendering.QualityLevel = 1
+    end)
+end
+
+local function ApplyAntiLagToObject(obj)
+    if not getgenv().Settings.Antilag then return end
+    pcall(function()
+        if obj:IsA("Part") or obj:IsA("UnionOperation") or obj:IsA("MeshPart") then
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.Reflectance = 0
+        elseif obj:IsA("Decal") and obj.Name ~= "DevHubIcon" then
+            obj.Transparency = 1
+        elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") then
+            obj.Lifetime = NumberRange.new(0)
+        end
+    end)
+end
+
+-- [[ ANTI-LAG LOOP - ทำงานตลอดเวลาเมื่อเปิด ]]
+task.spawn(function()
+    while getgenv().Settings.Running and task.wait(3) do
+        if getgenv().Settings.Antilag then
+            ApplyAntiLag()
+            -- Apply กับ objects ทั้งหมดใน game
+            for _, obj in pairs(game:GetDescendants()) do
+                ApplyAntiLagToObject(obj)
             end
-        end)
+        end
     end
 end)
+
+-- [[ ANTI-LAG สำหรับ OBJECTS ใหม่ (เมื่อด่านเปลี่ยน) ]]
+local AntiLagConn = game.DescendantAdded:Connect(function(obj)
+    if getgenv().Settings.Antilag then
+        task.wait(0.1) -- รอให้ object โหลดเสร็จ
+        ApplyAntiLagToObject(obj)
+    end
+end)
+table.insert(getgenv().AdminHubConnections, AntiLagConn)
+
+-- [[ WORKSPACE CHILDREN ADDED (จับเมื่อด่านเปลี่ยน) ]]
+local MapChangeConn = workspace.ChildAdded:Connect(function(child)
+    if getgenv().Settings.Antilag then
+        task.wait(0.5) -- รอให้แมพโหลดเสร็จ
+        ApplyAntiLag()
+        for _, obj in pairs(child:GetDescendants()) do
+            ApplyAntiLagToObject(obj)
+        end
+    end
+end)
+table.insert(getgenv().AdminHubConnections, MapChangeConn)
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Parent = SettingsTab
 CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
@@ -823,20 +864,6 @@ local AimbotConnection = RunService.RenderStepped:Connect(function()
                 local TargetCF = CFrame.new(CurrentCF.Position, BestTarget.Position)
                 -- เล็งไปที่เป้าหมายด้วยความลื่นไหล
                 Cam.CFrame = CurrentCF:Lerp(TargetCF, getgenv().Settings.Smoothness)
-                
-                -- Auto Fire: ยิงอัตโนมัติเมื่อเล็งเป้าหมายใน FOV
-                if getgenv().Settings.AutoFire then
-                    local mouse = LocalPlayer:GetMouse()
-                    if mouse then
-                        -- Simulate mouse click using VirtualInputManager
-                        pcall(function()
-                            local vim = game:GetService("VirtualInputManager")
-                            vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, true, game, 1)
-                            task.wait(0.01)
-                            vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, false, game, 1)
-                        end)
-                    end
-                end
             end
         end
     end)
@@ -1089,111 +1116,76 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end
 end)
 
--- [[ SILENT AIM HOOK - ยิงโดนเป้าโดยไม่ต้องเล็ง ]]
-local function GetClosestPlayerToMouse()
-    local Cam = workspace.CurrentCamera
-    if not Cam then return nil end
-    
-    local Mouse = LocalPlayer:GetMouse()
-    local ShortestDistance = getgenv().Settings.FOVSize
-    local ClosestPlayer = nil
-    local TargetPart = nil
-    
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character then
-            local char = plr.Character
-            local humanoid = char:FindFirstChild("Humanoid")
-            local targetPartName = getgenv().Settings.SilentAimPart or "Head"
-            local part = char:FindFirstChild(targetPartName) or char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-            
-            if humanoid and part and humanoid.Health > 0 then
-                -- Team Check
-                if getgenv().Settings.TeamCheck and plr.Team == LocalPlayer.Team then continue end
+-- [[ AUTO FIRE LOOP - ยิงอัตโนมัติแบบมี Cooldown + Wall Check ]]
+local LastAutoFireTime = 0
+local AutoFireCooldown = 0.15 -- ยิงได้ทุก 0.15 วินาที (ป้องกันยิงมั่ว)
+
+task.spawn(function()
+    while getgenv().Settings.Running and task.wait(0.05) do
+        if getgenv().Settings.AutoFire and getgenv().Settings.Aimbot then
+            pcall(function()
+                local Cam = workspace.CurrentCamera
+                if not Cam then return end
                 
-                local Pos, OnScreen = Cam:WorldToViewportPoint(part.Position)
-                if OnScreen then
-                    local MousePos = Vector2.new(Mouse.X, Mouse.Y)
-                    local TargetPos = Vector2.new(Pos.X, Pos.Y)
-                    local Distance = (MousePos - TargetPos).Magnitude
-                    
-                    if Distance < ShortestDistance then
-                        -- Wall Check
-                        if getgenv().Settings.WallCheck then
-                            if CheckWall(part) then
-                                ShortestDistance = Distance
-                                ClosestPlayer = plr
-                                TargetPart = part
-                            end
-                        else
-                            ShortestDistance = Distance
-                            ClosestPlayer = plr
-                            TargetPart = part
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    return ClosestPlayer, TargetPart
-end
-
--- Store original metatable
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-local oldIndex = mt.__index
-
--- Make metatable writable
-if setreadonly then
-    setreadonly(mt, false)
-elseif make_writeable then
-    make_writeable(mt)
-end
-
--- Hook __namecall (สำหรับ Remote calls)
-mt.__namecall = newcclosure(function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
-    
-    if getgenv().Settings.SilentAim and getgenv().Settings.Running then
-        local _, targetPart = GetClosestPlayerToMouse()
-        
-        if targetPart then
-            -- ตรวจสอบว่าเป็น RemoteEvent/RemoteFunction
-            if (method == "FireServer" or method == "InvokeServer") and self:IsA("RemoteEvent") or self:IsA("RemoteFunction") then
-                -- แก้ไข arguments ที่เป็น Position/CFrame/Ray
-                for i, arg in pairs(args) do
-                    if typeof(arg) == "Vector3" then
-                        args[i] = targetPart.Position
-                    elseif typeof(arg) == "CFrame" then
-                        args[i] = CFrame.new(args[i].Position, targetPart.Position)
-                    elseif typeof(arg) == "Ray" then
-                        args[i] = Ray.new(arg.Origin, (targetPart.Position - arg.Origin).Unit * 1000)
-                    elseif type(arg) == "table" then
-                        -- หลายเกมส่ง table ที่มี Position/Target
-                        for k, v in pairs(arg) do
-                            if typeof(v) == "Vector3" then
-                                args[i][k] = targetPart.Position
-                            elseif typeof(v) == "CFrame" then
-                                args[i][k] = CFrame.new(v.Position, targetPart.Position)
+                local currentTime = tick()
+                
+                -- เช็ค Cooldown ก่อนยิง
+                if currentTime - LastAutoFireTime < AutoFireCooldown then return end
+                
+                -- หาเป้าหมายที่ใกล้ที่สุดใน FOV
+                local BestTarget = nil
+                local MinDist = getgenv().Settings.FOVSize
+                local ScreenCenter = Vector2.new(Cam.ViewportSize.X / 2, Cam.ViewportSize.Y / 2)
+                
+                for _, plr in pairs(Players:GetPlayers()) do
+                    if plr ~= LocalPlayer and plr.Character then
+                        local char = plr.Character
+                        local head = char:FindFirstChild("Head")
+                        local humanoid = char:FindFirstChild("Humanoid")
+                        
+                        if head and humanoid and humanoid.Health > 0 then
+                            -- Team Check
+                            if getgenv().Settings.TeamCheck and plr.Team == LocalPlayer.Team then continue end
+                            
+                            local Pos, OnScreen = Cam:WorldToViewportPoint(head.Position)
+                            
+                            if OnScreen then
+                                local Dist = (ScreenCenter - Vector2.new(Pos.X, Pos.Y)).Magnitude
+                                
+                                -- Wall Check - เช็คว่าเห็นเป้าหมายจริงหรือไม่ (ไม่ตดกำแพง)
+                                if Dist < MinDist then
+                                    if getgenv().Settings.WallCheck then
+                                        if CheckWall(head) then
+                                            MinDist = Dist
+                                            BestTarget = head
+                                        end
+                                    else
+                                        MinDist = Dist
+                                        BestTarget = head
+                                    end
+                                end
                             end
                         end
                     end
                 end
-                return oldNamecall(self, unpack(args))
-            end
+                
+                -- ยิงถ้ามีเป้าหมายและผ่าน Wall Check
+                if BestTarget then
+                    local mouse = LocalPlayer:GetMouse()
+                    if mouse then
+                        local vim = game:GetService("VirtualInputManager")
+                        vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, true, game, 1)
+                        task.wait(0.02)
+                        vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, false, game, 1)
+                        LastAutoFireTime = currentTime
+                    end
+                end
+            end)
         end
     end
-    
-    return oldNamecall(self, ...)
 end)
 
--- Restore readonly if needed
-if setreadonly then
-    setreadonly(mt, true)
-end
-
-print("[AdminHub] Silent Aim Hook Loaded!")
+print("[AdminHub] Auto Fire with Cooldown + Wall Check Loaded!")
 
 -- [[ CLEANUP ON LEAVE ]]
 local RemoveConn = Players.PlayerRemoving:Connect(function(plr)
