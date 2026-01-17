@@ -1,32 +1,8 @@
-New Replace ( Can Downgrade and up version )
-
-POST https://twplay.redfinger.com/osfingerauth/order/checkGoods.json?lang=en_US&client=web&uuid=UaimGfBx8HypyPQ00c6nafoTtbdV73uHZsKoESxMX2WEK7YihX&versionName=2.52.6&versionCode=200520006&languageType=en_US&sessionId=9c58b345fb764e0ebb485eaab29ce439&userId=13445763&channelCode=web&serverNode=tw&timestamp=1768614188434&userSource=web&medium=organic&campaign=organic&sign=1bbfda5dab53d2d268dbfd5f6cb324fb 200
+POST https://twplay.redfinger.com/osfingerauth/pad/renewalPad.json?lang=en_US&client=web&uuid=UaimGfBx8HypyPQ00c6nafoTtbdV73uHZsKoESxMX2WEK7YihX&versionName=2.52.6&versionCode=200520006&languageType=en_US&sessionId=9c58b345fb764e0ebb485eaab29ce439&userId=13445763&channelCode=web&serverNode=tw&timestamp=1768615670676&userSource=web&medium=organic&campaign=organic&sign=a232fbfdaec2788814a6343820482d9a 200
 
 Request Data
 
-goodsOptionsTypeValueJson={"idc_code":"TW_IDC_04","rom_version":"12.0"}&classifyValue=17
-
-Request Headers
-
-Accept: application/json, text/plain, */*
-Content-Type: application/x-www-form-urlencoded
-Server-Node: tw
-Api-Version: 200520006
-Authorization: 13445763 9c58b345fb764e0ebb485eaab29ce439
-User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36
-Referer: https://www.cloudemulator.net/app/phone?channelCode=web
-
-Response Headers
-
-content-type: application/json;charset=UTF-8
-
-{"resultCode":0,"resultMsg":null,"resultInfo":{"resultCode":0,"resultInfo":""},"totalCount":1,"errorStackTrace":null,"requestParameter":null,"elapsedTime":8,"logId":"0636229b-26a9-4538-833a-54a5e87d7f5c"}
-
-POST https://twplay.redfinger.com/osfingerauth/pad/renewalPad.json?lang=en_US&client=web&uuid=UaimGfBx8HypyPQ00c6nafoTtbdV73uHZsKoESxMX2WEK7YihX&versionName=2.52.6&versionCode=200520006&languageType=en_US&sessionId=9c58b345fb764e0ebb485eaab29ce439&userId=13445763&channelCode=web&serverNode=tw&timestamp=1768614189497&userSource=web&medium=organic&campaign=organic&sign=35a19c91780cd8574bfbeddafb447270 200
-
-Request Data
-
-padCode=VM010013225100&goodsOptionsTypeValueJson=%7B%22idc_code%22%3A%22TW_IDC_04%22%2C%22rom_version%22%3A%2212.0%22%7D&renewalType=0&losslessConfirm=
+padCode=VM010207004038&goodsOptionsTypeValueJson=%7B%22idc_code%22%3A%22TW_IDC_04%22%2C%22rom_version%22%3A%2210.0%22%7D&renewalType=0&losslessConfirm=
 
 Request Headers
 
@@ -40,4 +16,4 @@ Response Headers
 
 content-type: application/json;charset=UTF-8
 
-{"resultCode":0,"resultMsg":"Cloud phone replaced successful","resultInfo":"Cloud phone replaced successful","totalCount":1,"errorStackTrace":null,"requestParameter":null,"elapsedTime":79,"logId":"0a9774f4-6987-4f49-a0a0-1f8f848bb5a0"}
+{"resultCode":0,"resultMsg":"Cloud phone replaced successful","resultInfo":"Cloud phone replaced successful","totalCount":1,"errorStackTrace":null,"requestParameter":null,"elapsedTime":80,"logId":"888eef5b-b56b-4768-a5db-e1289dc7d6d6"}
