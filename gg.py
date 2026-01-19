@@ -7,26 +7,19 @@ import json
 # ⚙️ ตั้งค่า (CONFIG)
 # ===========================
 DEFAULT_PLACE_ID = "121864768012064"
-
-# ขนาดหน้าต่าง
 WIN_WIDTH = 450
 WIN_HEIGHT = 700
 OFFSET_STEP = 80 
-
-# ใช้ /sdcard/ เพื่อแก้ปัญหา Read-only file system
 CONFIG_FILE = "/sdcard/roblox_layout.json"
-
-# คำค้นหา
 SEARCH_KEYWORDS = ["roblox", "arceus", "hydrogen", "fluxus"]
 
 # ===========================
-# 🛠️ ฟังก์ชันระบบ
+# 🛠️ ฟังก์ชันระบบ (ไม่มี sudo)
 # ===========================
 
-def run_root(cmd):
-    # ถ้าขึ้น Error "No superuser" ให้ลองลบ sudo ออกเหลือแค่ cmd
-    # แต่ปกติใส่ไว้ชัวร์กว่า
-    os.system(f"sudo {cmd}")
+def run_cmd(cmd):
+    # รันคำสั่งตรงๆ เพราะเราอยู่ในโหมด su แล้ว
+    os.system(cmd)
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
@@ -42,9 +35,10 @@ def save_config(data):
         json.dump(data, f, indent=4)
 
 def scan_packages():
-    print("🔍 กำลังสแกนหา Roblox และ Mod ในเครื่อง...")
+    print("🔍 กำลังสแกนหา Roblox...")
     found_apps = []
     try:
+        # ใช้ pm list packages ตรงๆ
         cmd_output = subprocess.check_output(["pm", "list", "packages"], text=True)
         lines = cmd_output.strip().splitlines()
         
@@ -53,16 +47,14 @@ def scan_packages():
             pkg_name = line.replace("package:", "").strip()
             for keyword in SEARCH_KEYWORDS:
                 if keyword in pkg_name.lower():
-                    # คำนวณตำแหน่ง
                     start_x = count * OFFSET_STEP
                     start_y = count * OFFSET_STEP
                     bounds = f"{start_x},{start_y},{start_x + WIN_WIDTH},{start_y + WIN_HEIGHT}"
                     
-                    # --- จุดที่แก้ใหม่ (สำคัญ) ---
-                    # บังคับให้ใช้ Activity นี้เสมอ ไม่ว่าชื่อ App จะเป็น clientb หรืออะไรก็ตาม
+                    # บังคับ Activity
                     activity = "com.roblox.client.Activity"
 
-                    print(f"   👉 เจอตัวที่ {count+1}: {pkg_name} (Pos: {start_x},{start_y})")
+                    print(f"   👉 เจอ: {pkg_name}")
                     
                     found_apps.append({
                         "name": f"Account {count+1}",
@@ -77,7 +69,7 @@ def scan_packages():
         print(f"❌ Error scanning: {e}")
     return found_apps
 
-def launch_app_staggered(app):
+def launch_app(app):
     pkg = app['package']
     act = app['activity']
     place = app['place_id']
@@ -85,11 +77,9 @@ def launch_app_staggered(app):
     
     print(f"🚀 Launching: {pkg}...")
     
-    # 1. ฆ่าโปรเซสเก่า
-    run_root(f"am force-stop {pkg}")
+    run_cmd(f"am force-stop {pkg}")
     time.sleep(1)
     
-    # 2. เปิดเกม
     cmd = (
         f"am start -n {pkg}/{act} "
         f"--windowingMode 5 "
@@ -97,33 +87,26 @@ def launch_app_staggered(app):
         f"-a android.intent.action.VIEW "
         f"-d roblox://placeId={place}"
     )
-    run_root(cmd)
+    run_cmd(cmd)
 
 def main():
-    print("--- ROBLOX AUTO STACKER BOT (FIXED) ---")
-    run_root("ls > /dev/null") 
-
-    # 1. โหลดหรือสแกนใหม่
-    apps = load_config()
+    print("--- ROBLOX BOT (ROOT MODE) ---")
     
-    # ถ้าไม่เจอ หรือ อยากสแกนใหม่ (เช็คไฟล์ว่างเปล่า)
+    # เช็คว่า Config มีไหม
+    apps = load_config()
     if not apps:
-        print("⚠️ ไม่พบ Config เริ่มสแกนใหม่...")
         apps = scan_packages()
         save_config(apps)
-    else:
-        print(f"✅ โหลดข้อมูลเดิม ({len(apps)} แอพ)")
 
-    # 2. เริ่มรัน
-    print("\n🏁 เริ่มเปิดแอพ... (กด Ctrl+C เพื่อหยุด)")
+    print("\n🏁 เริ่มระบบ... (กด Ctrl+C เพื่อหยุด)")
     
     while True:
         for app in apps:
-            launch_app_staggered(app)
-            print("⏳ รอ 15 วินาทีก่อนเปิดตัวถัดไป...")
+            launch_app(app)
+            print("⏳ รอ 15 วินาที...")
             time.sleep(15)
         
-        print("\n💤 เปิดครบแล้ว... รอ 20 นาที")
+        print("\n💤 รอ 20 นาที...")
         time.sleep(1200)
 
 if __name__ == "__main__":
