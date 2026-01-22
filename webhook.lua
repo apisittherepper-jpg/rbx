@@ -1,6 +1,3 @@
--- [[ SECRET FISH SCANNER - V31 ZERO LAG ]]
--- แก้ปัญหากระตุก 100% โดยย้ายระบบดึงรูปไปทำเบื้องหลัง (Async)
--- Features: Reverse Parser | Proxy Image | Anti-Dup | Nano UI
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
@@ -13,11 +10,15 @@ local Request = http_request or request or HttpPost or syn.request
 -- 🖼️ [[ LOGO CONFIG ]] 🖼️
 local LogoID = "rbxassetid://1767893962938"
 
-local SettingsFile = "secret_nano_v31.txt"
+local SettingsFile = "secret_nano_v32.txt"
 local Webhook_URL = ""
 local LastMessage = ""
 local LastTime = 0
 local SentCache = {}
+
+-- ตัวแปร Monitor
+local MonitorEnabled = false
+local LastPlayerList = {}
 
 local ColorOptions = {
     {Name = "Secret", RGB = "rgb(24, 255, 152)", Hex = 16758827, LabelColor = Color3.fromRGB(24, 255, 152)},
@@ -28,7 +29,7 @@ local ColorOptions = {
 }
 local CurrentTarget = ColorOptions[1]
 
--- [[ 🛠️ GUI SETUP (Nano V30 Base) ]]
+-- [[ 🛠️ GUI SETUP ]]
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local UIStroke = Instance.new("UIStroke")
@@ -40,6 +41,7 @@ local DropdownBtn = Instance.new("TextButton")
 local DropdownFrame = Instance.new("ScrollingFrame")
 local SaveBtn = Instance.new("TextButton")
 local TestBtn = Instance.new("TextButton")
+local MonitorBtn = Instance.new("TextButton") -- ปุ่มใหม่
 local ToggleBtn = Instance.new("ImageButton")
 
 pcall(function()
@@ -48,12 +50,12 @@ pcall(function()
     else ScreenGui.Parent = CoreGui end
 end)
 
--- Main Frame (180x130)
-MainFrame.Name = "NanoZeroLagUI"
+-- Main Frame (ขยายความสูงเป็น 160)
+MainFrame.Name = "NanoMonitorUI"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
-MainFrame.Position = UDim2.new(0.5, -90, 0.5, -65)
-MainFrame.Size = UDim2.new(0, 180, 0, 130)
+MainFrame.Position = UDim2.new(0.5, -90, 0.5, -80)
+MainFrame.Size = UDim2.new(0, 180, 0, 160) -- สูงขึ้นเพื่อใส่ Monitor
 MainFrame.Active = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
@@ -115,7 +117,7 @@ DropdownFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 DropdownFrame.Position = UDim2.new(0, 10, 0, 82)
 DropdownFrame.Size = UDim2.new(1, -20, 0, 100)
 DropdownFrame.Visible = false
-DropdownFrame.ZIndex = 10
+DropdownFrame.ZIndex = 20
 DropdownFrame.BorderSizePixel = 0
 DropdownFrame.ScrollBarThickness = 2
 Instance.new("UICorner", DropdownFrame).CornerRadius = UDim.new(0, 4)
@@ -134,7 +136,7 @@ for i, colorData in ipairs(ColorOptions) do
     OptionBtn.TextColor3 = colorData.LabelColor
     OptionBtn.TextSize = 9
     OptionBtn.TextXAlignment = Enum.TextXAlignment.Left
-    OptionBtn.ZIndex = 11
+    OptionBtn.ZIndex = 21
     OptionBtn.MouseButton1Click:Connect(function()
         CurrentTarget = colorData
         DropdownBtn.Text = CurrentTarget.Name .. " ▼"
@@ -143,26 +145,39 @@ for i, colorData in ipairs(ColorOptions) do
     end)
 end
 
+-- Save Button
 SaveBtn.Parent = MainFrame
 SaveBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 SaveBtn.Position = UDim2.new(0, 10, 0, 90)
-SaveBtn.Size = UDim2.new(0.40, 0, 0, 25)
+SaveBtn.Size = UDim2.new(0.30, 0, 0, 25)
 SaveBtn.Font = Enum.Font.GothamBold
 SaveBtn.Text = "SAVE"
 SaveBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
 SaveBtn.TextSize = 9
 Instance.new("UICorner", SaveBtn).CornerRadius = UDim.new(0, 4)
 
+-- Test Button
 TestBtn.Parent = MainFrame
 TestBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 TestBtn.AnchorPoint = Vector2.new(1, 0)
 TestBtn.Position = UDim2.new(1, -10, 0, 90)
-TestBtn.Size = UDim2.new(0.25, 0, 0, 25)
+TestBtn.Size = UDim2.new(0.30, 0, 0, 25)
 TestBtn.Font = Enum.Font.GothamBold
 TestBtn.Text = "TEST"
 TestBtn.TextColor3 = Color3.fromRGB(255, 200, 50)
 TestBtn.TextSize = 9
 Instance.new("UICorner", TestBtn).CornerRadius = UDim.new(0, 4)
+
+-- Monitor Button (ใหม่)
+MonitorBtn.Parent = MainFrame
+MonitorBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MonitorBtn.Position = UDim2.new(0, 10, 0, 125)
+MonitorBtn.Size = UDim2.new(1, -20, 0, 25)
+MonitorBtn.Font = Enum.Font.GothamBold
+MonitorBtn.Text = "Player Check: OFF"
+MonitorBtn.TextColor3 = Color3.fromRGB(255, 80, 80) -- แดง
+MonitorBtn.TextSize = 9
+Instance.new("UICorner", MonitorBtn).CornerRadius = UDim.new(0, 4)
 
 ToggleBtn.Parent = ScreenGui
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -249,7 +264,6 @@ local function ParseFishData(fullString)
 end
 
 -- [[ 🖼️ ASYNC IMAGE FETCHER ]] 
--- ย้ายระบบดึงรูปมาไว้ในฟังก์ชันที่ทำงานแบบ Blocking ได้ (เพราะเราจะเรียกผ่าน Task.Spawn)
 local FishDB = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("ModelDownloader"):WaitForChild("Collection"):WaitForChild("Fish")
 local ManualFishDB = { ["Zombie Megalodon"] = "110861329686146", ["Zombie Shark"] = "118840558184490" }
 
@@ -257,11 +271,7 @@ local function GetRealImageLink(idString)
     local idNumber = string.match(idString, "%d+")
     if not idNumber then return "" end
     local proxyUrl = "https://thumbnails.roproxy.com/v1/assets?assetIds="..idNumber.."&size=420x420&format=Png"
-    
-    -- ตรงนี้คือจุดที่เคยทำให้เกมค้าง (HTTP Request)
-    -- ตอนนี้ปลอดภัยแล้ว เพราะถูกเรียกใน Thread แยก
     local success, response = pcall(function() return Request({Url = proxyUrl, Method = "GET"}) end)
-    
     if success and response.StatusCode == 200 then
         local data = HttpService:JSONDecode(response.Body)
         if data and data.data and data.data[1] and data.data[1].imageUrl then return data.data[1].imageUrl end
@@ -298,28 +308,57 @@ CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
 ToggleBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
 
 TestBtn.MouseButton1Click:Connect(function()
-    -- Test Button Logic (Simple Async)
     task.spawn(function()
         TestBtn.Text = "..."
         local url = WebhookInput.Text ~= "" and WebhookInput.Text or Webhook_URL
-        if url == "" then TestBtn.Text = "❌"; task.wait(1); TestBtn.Text = "🔔 TEST" return end
-        
-        -- Send Test
+        if url == "" then TestBtn.Text = "❌"; task.wait(1); TestBtn.Text = "TEST" return end
         pcall(function()
-            Request({
-                Url=url, Method="POST", Headers={["content-type"]="application/json"},
-                Body=HttpService:JSONEncode({["embeds"]={{["title"]="🔔 CONNECTED",["color"]=65280}}})
-            })
+            Request({Url=url, Method="POST", Headers={["content-type"]="application/json"}, Body=HttpService:JSONEncode({["embeds"]={{["title"]="🔔 CONNECTED",["color"]=65280}}})})
         end)
-        
-        TestBtn.Text = "✅"
-        task.wait(1); TestBtn.Text = "🔔 TEST"
+        TestBtn.Text = "✅"; task.wait(1); TestBtn.Text = "TEST"
     end)
+end)
+
+-- Monitor Logic
+MonitorBtn.MouseButton1Click:Connect(function()
+    MonitorEnabled = not MonitorEnabled
+    if MonitorEnabled then
+        MonitorBtn.Text = "Player Check: ON"
+        MonitorBtn.TextColor3 = Color3.fromRGB(80, 255, 80) -- เขียว
+        LastPlayerList = {}
+        for _, p in pairs(Players:GetPlayers()) do table.insert(LastPlayerList, p.Name) end
+    else
+        MonitorBtn.Text = "player Check: OFF"
+        MonitorBtn.TextColor3 = Color3.fromRGB(255, 80, 80) -- แดง
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if MonitorEnabled then
+            local CurrentList = {}
+            local CurrentSet = {}
+            for _, p in pairs(Players:GetPlayers()) do table.insert(CurrentList, p.Name); CurrentSet[p.Name] = true end
+            if #LastPlayerList > 0 then
+                for _, name in pairs(LastPlayerList) do
+                    if not CurrentSet[name] and Webhook_URL ~= "" then
+                        pcall(function()
+                            Request({
+                                Url=Webhook_URL, Method="POST", Headers={["content-type"]="application/json"},
+                                Body=HttpService:JSONEncode({["embeds"]={{["title"]="❌ DISCONNECTED",["description"]="**"..name.."** left.",["color"]=16711680,["footer"]={["text"]=os.date("%X")}}}})
+                            })
+                        end)
+                    end
+                end
+            end
+            LastPlayerList = CurrentList
+        end
+        task.wait(10) -- เช็คทุก 10 วิ
+    end
 end)
 
 -- [[ ⚡ CORE LOGIC (THREADED) ⚡ ]]
 local function Analyze(msg)
-    -- 1. กรองข้อความเบื้องต้น (เร็วมาก ไม่ค้าง)
     if msg == LastMessage and (os.time() - LastTime < 5) then return end
     if CurrentTarget.RGB ~= "ALL" and not string.find(msg, CurrentTarget.RGB, 1, true) then return end
     
@@ -330,23 +369,18 @@ local function Analyze(msg)
     local p, rawFishName, w = string.match(clean, ":%s*(.-)%s+obtained an?%s+(.-)%s+%((.-)%)")
     
     if p and rawFishName then
-        -- 🔥 2. แยก Thread ทันที! (จุดแก้กระตุก) 🔥
         task.spawn(function()
-            -- เช็คกันซ้ำ
             local dupKey = p.."|"..rawFishName.."|"..w
             if SentCache[dupKey] and (os.time() - SentCache[dupKey] < 10) then return end
             SentCache[dupKey] = os.time()
             LastMessage = msg; LastTime = os.time()
 
-            -- หา UserID
             local uid = 1
             pcall(function() if Players:FindFirstChild(p) then uid = Players[p].UserId end end)
             
-            -- Parsing & Fetching (ใช้เวลาโหลด HTTP แต่ไม่ค้างจอเพราะอยู่ใน task.spawn)
             local realName, status = ParseFishData(rawFishName)
             local img = GetFishImage(realName)
             
-            -- Payload
             local payload = {
                 ["embeds"] = {{
                     ["title"] = "🌟 " .. CurrentTarget.Name .. " CATCH! 🌟",
@@ -363,7 +397,6 @@ local function Analyze(msg)
                 }}
             }
             
-            -- Send Webhook
             pcall(function()
                 Request({Url=Webhook_URL, Method="POST", Headers={["content-type"]="application/json"}, Body=HttpService:JSONEncode(payload)})
             end)
